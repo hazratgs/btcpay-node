@@ -4,8 +4,7 @@ const axios = require('axios')
 const crypto = require('crypto')
 const bs58 = require('bs58')
 const qs = require('querystring')
-const rp = require('request-promise')
-const _ = require('underscore')
+const fs = require('fs')
 
 class BTCPay {
   constructor() {
@@ -29,8 +28,16 @@ class BTCPay {
     })
   }
 
-  generateKeys () {
-    return ec.genKeyPair()
+  generateKeys() {
+    const keys = ec.genKeyPair()
+    fs.writeFile('./data.json', JSON.stringify(keys, null, 2), 'utf-8', (err) => {
+      if (err) console.log('err generateKeys:', err)
+    })
+  }
+
+  loadKeys() {
+    const file = fs.readFileSync('./data.json', 'utf8')
+    return ec.keyFromPrivate(file)
   }
 
   getSinFromKey() {
@@ -54,7 +61,7 @@ class BTCPay {
     return h2.slice(0, 4)
   }
 
-  sign (message) {
+  sign(message) {
     let digest = crypto.createHash('sha256').update(message).digest()
     return Buffer.from(this.keypar.sign(digest).toDER())
   }
@@ -70,6 +77,7 @@ class BTCPay {
 
   async createToken(code) {
     try {
+      this.keypar = this.generateKeys()
       this.clientId = this.getSinFromKey()
       const token = await this.request.post('tokens', {
         pairingCode: code,
@@ -82,7 +90,7 @@ class BTCPay {
 
       this.token = token
     } catch (e) {
-      console.log(e)
+      console.log('err createToken:', e)
     }
   }
 
@@ -100,29 +108,11 @@ class BTCPay {
 
       this.token = token
     } catch (e) {
-      console.log(e)
+      console.log('err getToken:', e)
     }
   }
 
-  async getRates () {
-    try {
-      await this.updateToken()
-      const payload = {
-        storeId: this.storeId,
-        currencyPairs: 'BTC_USD',
-        token: this.token.token
-      }
-      const rates = await this.request.get('rates', {
-        params: payload,
-        headers: this.setHeaders('rates', '?' + qs.stringify(payload))
-      })
-      return rates
-    } catch (e) {
-      console.log(e)
-    }
-  }
-
-  async updateToken () {
+  async updateToken() {
     try {
       const token = await this.request.post('tokens', {
         label: this.label,
@@ -136,11 +126,29 @@ class BTCPay {
 
       this.token = token
     } catch (e) {
-      console.log(e)
+      console.log('err updateToken:', e)
     }
   }
 
-  async createInvoice () {
+  async getRates() {
+    try {
+      await this.updateToken()
+      const payload = {
+        storeId: this.storeId,
+        currencyPairs: 'BTC_USD',
+        token: this.token.token
+      }
+      const rates = await this.request.get('rates', {
+        params: payload,
+        headers: this.setHeaders('rates', '?' + qs.stringify(payload))
+      })
+      return rates
+    } catch (e) {
+      console.log('err getRates:', e)
+    }
+  }
+
+  async createInvoice() {
     try {
       await this.updateToken()
       const payload = {
@@ -153,10 +161,9 @@ class BTCPay {
       })
       return invoice
     } catch (e) {
-      console.log(e)
+      console.log('err createInvoice:', e)
     }
   }
 }
 
 const client = new BTCPay()
-client.createInvoice()
