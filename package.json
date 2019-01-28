@@ -1,0 +1,25 @@
+{
+  "name": "bitpay-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "body-parser": "^1.18.3",
+    "bs58": "^4.0.1",
+    "btcpay": "github:btcpayserver/node-btcpay",
+    "cors": "^2.8.5",
+    "elliptic": "^6.4.1",
+    "express": "^4.16.4",
+    "querystring": "^0.2.0",
+    "request-promise": "^4.2.2",
+    "underscore": "^1.9.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
