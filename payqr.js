@@ -31,7 +31,6 @@ class PayQR {
       if (hasKey) {
         this.loadKeys()
         this.clientId = this.getSinFromKey()
-        this.createInvoice({ currency: 'RUB', price: 900 })
       }
     } catch (e) {
       console.log('not file key')
