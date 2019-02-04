@@ -8,45 +8,57 @@ const fs = require('fs')
 
 class PayQR {
   constructor() {
-    this.url = 'https://btcpay-beta.testessential.net/'
+    this.url = 'https://payqr-beta.testessential.net/'
     this.keypar = null
-    this.storeId = '6PBx629oJDVpzPJcrkJmzsKMdqM4eLqYNtDt655PtV18'
+    this.storeId = '3VwtZEmGpkCeiLnmU9SvT3pAKWHEgzPyp5VAY4WDZkTf'
     this.request = null
     this.token = null
     this.clientId = ''
-    this.label = ''
+    this.label = 'token'
     this.facade = 'merchant'
 
     this.request = axios.create({
       baseURL: this.url,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'X-Accept-Version': '2.0.0'
       }
     })
 
-    // try {
-    //   const hasKey = fs.lstatSync('./key').isFile()
-    //   if (hasKey) {
-    //     this.loadKeys()
-    //     this.clientId = this.getSinFromKey()
-    //   }
-    // } catch (e) {
-    //   console.log('not file key')
-    // }
+    try {
+      const hasKey = fs.lstatSync('./key.json').isFile()
+      if (hasKey) {
+        this.loadKeys()
+        this.clientId = this.getSinFromKey()
+        this.createInvoice({ currency: 'RUB', price: 900 })
+      }
+    } catch (e) {
+      console.log('not file key')
+    }
   }
 
   generateKeys() {
     const keys = ec.genKeyPair()
-    fs.writeFile('./key', JSON.stringify(keys.priv), 'utf-8', (err) => {
-      if (err) console.log('err generateKeys:', err)
-    })
     return keys
   }
 
+  saveKeys() {
+    const data = {
+      key: this.keypar.priv,
+      token: this.token
+    }
+
+    fs.writeFile('./key.json', JSON.stringify(data), 'utf-8', (err) => {
+      if (err) console.log('err generateKeys:', err)
+    })
+  }
+
   loadKeys() {
-    const file = fs.readFileSync('./key', 'utf8')
-    this.keypar = ec.keyFromPrivate(Buffer.from(JSON.parse(file), 'hex'))
+    const file = fs.readFileSync('./key.json', 'utf8')
+    const data = JSON.parse(file)
+    this.keypar = ec.keyFromPrivate(Buffer.from(data.key, 'hex'))
+    this.token = data.token
     return this.keypar
   }
 
@@ -80,7 +92,7 @@ class PayQR {
     const url = this.url + uri + payload
     const headers = {
       'X-Identity': Buffer.from(this.keypar.getPublic().encodeCompressed()).toString('hex'),
-      'X-Signature': this.sign(url, this.keypar).toString('hex')
+      'X-Signature': this.sign(url).toString('hex')
     }
     return headers
   }
@@ -98,77 +110,25 @@ class PayQR {
           return token
         })
 
-      this.token = token
+      this.token = token.token
+      this.saveKeys()
     } catch (e) {
       console.log('err createToken:', e)
       return e
     }
   }
 
-  async updateToken() {
-    try {
-      const token = await this.request.post('tokens', {
-        label: this.label,
-        id: this.clientId,
-        facade: this.facade
-      })
-        .then(response => {
-          const [token] = response.data.data
-          return token
-        })
-
-      this.token = token
-    } catch (e) {
-      console.log('err updateToken:', e)
-    }
-  }
-
-  async getToken() {
-    try {
-      const token = await this.request.post('tokens', {
-        label: 'app',
-        facade: 'merchant',
-        id: this.clientId
-      })
-        .then(response => {
-          const [token] = response.data.data
-          return token
-        })
-
-      this.token = token
-    } catch (e) {
-      console.log('err getToken:', e)
-    }
-  }
-
-  async getRates() {
-    try {
-      await this.updateToken()
-      const payload = {
-        storeId: this.storeId,
-        currencyPairs: 'BTC_USD',
-        token: this.token.token
-      }
-      const rates = await this.request.get('rates', {
-        params: payload,
-        headers: this.setHeaders('rates', '?' + qs.stringify(payload))
-      })
-      return rates
-    } catch (e) {
-      console.log('err getRates:', e)
-    }
-  }
-
   async createInvoice(payload) {
     try {
-      payload.token = this.token.token
+      if (!this.token) throw new Error('createInvoice: Токен не найден!')
+      payload.token = this.token
       const headers = this.setHeaders('invoices', JSON.stringify(payload))
       const invoice = await this.request.post('invoices', payload, {
         headers
       })
       return invoice
     } catch (e) {
-      console.log('err createInvoice:', e)
+      console.log('createInvoice:', e)
       return e
     }
   }
